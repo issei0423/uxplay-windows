@@ -66,14 +66,19 @@ static DWORD currentSessionId() {
     return sessionId;
 }
 
-static QString singleInstanceMutexName() {
-    return QStringLiteral("Local\\leapbtw.uxplay-windows.%1")
-        .arg(currentSessionId());
+// Instance 1 keeps the original names; instance N appends ".N".
+static QString instanceNameSuffix(int instance) {
+    return instance > 1 ? QStringLiteral(".%1").arg(instance) : QString();
 }
 
-static QString singleInstanceServerName() {
+static QString singleInstanceMutexName(int instance) {
+    return QStringLiteral("Local\\leapbtw.uxplay-windows.%1")
+        .arg(currentSessionId()) + instanceNameSuffix(instance);
+}
+
+static QString singleInstanceServerName(int instance) {
     return QStringLiteral("leapbtw.uxplay-windows.%1")
-        .arg(currentSessionId());
+        .arg(currentSessionId()) + instanceNameSuffix(instance);
 }
 
 static bool notifyRunningInstance(const QString &serverName) {
