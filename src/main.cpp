@@ -277,7 +277,8 @@ int main(int argc, char *argv[]) {
     const QList<QPair<QString, const char *>> decorations = {
         {"--label", "instanceLabel"},
         {"--frame", "instanceFrame"},
-        {"--icon", "instanceIcon"}
+        {"--icon", "instanceIcon"},
+        {"--label-size", "instanceLabelSize"}
     };
     const QStringList appArgs = app.arguments();
     for (int i = 1; i < appArgs.size(); ++i) {

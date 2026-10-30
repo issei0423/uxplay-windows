@@ -84,6 +84,7 @@ uxplay-windows.exe --instance 2 --label "Parent" --frame blue
 - `--label` sets the AirPlay name (replacing `-n`) and the video window title
 - `--frame` draws an even border around the video (`black`, `green`, `blue`, `red`, `yellow` or `white`)
 - `--tab` grows the top edge into a tab and draws the label in it; `--icon PATH` adds a PNG (transparency is kept) before the label
+- `--label-size N` sets the label height in video pixels (default 80); the tab grows with it
 - the drawing is applied through `-vc`, so an explicit `-vc` in `arguments.txt` turns it off
 
 </details>

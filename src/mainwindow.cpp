@@ -439,8 +439,18 @@ void MainWindow::applyLabelArgs(QStringList &args) const {
         }
     }
     const bool hasIcon = iconSize.isValid() && iconSize.height() > 0;
+
+    // --label-size is the text height in video pixels; the tab grows to fit
+    // one line of it (Pango lines are about 1.25 times the font size).
+    bool sizeOk = false;
+    int labelSize = qApp->property("instanceLabelSize").toString().toInt(&sizeOk);
+    if (!sizeOk || labelSize < 8 || labelSize > 400) {
+        labelSize = 80;
+    }
+    const int lineHeight = labelSize * 5 / 4;
     const int border = 24;
-    const int top = !tab ? border : (hasIcon ? 160 : 96);
+    const int tabHeight = qMax(hasIcon ? 160 : 0, lineHeight + 32);
+    const int top = tab ? tabHeight : border;
 
     QString converter = "videoconvert";
     if (framed) {
@@ -469,10 +479,17 @@ void MainWindow::applyLabelArgs(QStringList &args) const {
         } else if (frame == "white" || frame == "yellow") {
             style = " color=0xff000000";
         }
+        // auto-resize=false keeps the size in video pixels, so the text fits
+        // the tab whatever the stream resolution. Japanese-capable Windows
+        // fonts come first so CJK labels do not fall back to boxes.
         converter += QStringLiteral(
             " ! textoverlay text=\"%1\" valignment=top halignment=left"
-            " xpad=%2 ypad=%3 font-desc=\"Sans Bold 18\"%4 ! videoconvert")
-            .arg(text, QString::number(textX), QString::number(hasIcon ? 56 : 12), style);
+            " xpad=%2 ypad=%3 auto-resize=false"
+            " font-desc=\"Yu Gothic UI,Meiryo,Sans Bold %4px\"%5"
+            " ! videoconvert")
+            .arg(text, QString::number(textX),
+                 QString::number(qMax(0, (top - lineHeight) / 2)),
+                 QString::number(labelSize), style);
     }
     args << "-vc" << converter;
 }
