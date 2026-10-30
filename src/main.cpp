@@ -228,6 +228,20 @@ int main(int argc, char *argv[]) {
         ? QStringLiteral("uxplay-windows-%1").arg(instance)
         : QStringLiteral("uxplay-windows"));
     app.setProperty("instanceNumber", instance);
+    // --label and --frame decorate the video window (see MainWindow). Read
+    // them from QApplication so non-ASCII labels survive on Windows.
+    const QStringList appArgs = app.arguments();
+    for (int i = 1; i < appArgs.size(); ++i) {
+        const QString &arg = appArgs.at(i);
+        if ((arg == "--label" || arg == "--frame") && i + 1 < appArgs.size()) {
+            app.setProperty(arg == "--label" ? "instanceLabel" : "instanceFrame",
+                            appArgs.at(++i));
+        } else if (arg.startsWith("--label=")) {
+            app.setProperty("instanceLabel", arg.mid(QString("--label=").size()));
+        } else if (arg.startsWith("--frame=")) {
+            app.setProperty("instanceFrame", arg.mid(QString("--frame=").size()));
+        }
+    }
     if (!instanceValid) {
         QMessageBox::critical(
             nullptr,

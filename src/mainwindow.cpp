@@ -392,6 +392,54 @@ void MainWindow::applyRendererAndFullscreenArgs(QStringList &args) {
     }
 }
 
+// --label and --frame come from the command line. The label becomes the
+// AirPlay name and is drawn on the video; the frame adds a coloured border
+// whose thick top edge holds the label like a tab. An explicit -vc in the
+// arguments file is left unchanged.
+void MainWindow::applyLabelArgs(QStringList &args) const {
+    const QString label = qApp->property("instanceLabel").toString().trimmed();
+    const QString frame = qApp->property("instanceFrame").toString().trimmed().toLower();
+    if (label.isEmpty() && frame.isEmpty()) return;
+
+    if (!label.isEmpty()) {
+        const int nameIdx = args.indexOf("-n");
+        if (nameIdx >= 0 && nameIdx + 1 < args.size()) {
+            args[nameIdx + 1] = label;
+        } else {
+            args << "-n" << label;
+        }
+    }
+
+    if (args.contains("-vc")) return;
+
+    // videobox only knows these fill colours.
+    static const QStringList fills = {"black", "green", "blue", "red", "yellow", "white"};
+    const bool framed = fills.contains(frame);
+    if (!frame.isEmpty() && !framed) {
+        qWarning().noquote() << "[label] Unknown --frame colour, drawing no frame:" << frame;
+    }
+
+    QString converter = "videoconvert";
+    if (framed) {
+        converter += QStringLiteral(
+            " ! videobox fill=%1 top=-96 bottom=-16 left=-16 right=-16 ! videoconvert").arg(frame);
+    }
+    if (!label.isEmpty()) {
+        QString text = label;
+        text.replace("\\", "\\\\").replace("\"", "\\\"");
+        QString style;
+        if (!framed) {
+            style = " shaded-background=true";
+        } else if (frame == "white" || frame == "yellow") {
+            style = " color=0xff000000";
+        }
+        converter += QStringLiteral(
+            " ! textoverlay text=\"%1\" valignment=top halignment=left"
+            " xpad=24 ypad=12 font-desc=\"Sans Bold 18\"%2 ! videoconvert").arg(text, style);
+    }
+    args << "-vc" << converter;
+}
+
 void MainWindow::startServer() {
     if (m_worker && m_worker->isRunning()) return;
 
@@ -409,6 +457,7 @@ void MainWindow::startServer() {
     }
 
     applyRendererAndFullscreenArgs(args);
+    applyLabelArgs(args);
 
     // Only add -ble and start beacon if checkbox is checked
     if (!m_bleCheckbox) return;
@@ -456,15 +505,25 @@ void MainWindow::onAirplayStarted() {
     qInfo("AirPlay server started.");
 
     // Only explicitly selected Direct3D sinks are known to support Alt+Enter.
-    // Leave automatically selected GStreamer sink windows unchanged.
-    if (!m_rendererCombo ||
-        m_rendererCombo->currentData().toString() == "auto") {
+    // Leave automatically selected GStreamer sink windows unchanged unless a
+    // --label names them.
+    const QString label = qApp->property("instanceLabel").toString().trimmed();
+    const bool autoRenderer = !m_rendererCombo ||
+        m_rendererCombo->currentData().toString() == "auto";
+    if (autoRenderer && label.isEmpty()) {
         return;
+    }
+
+    QString newTitle = autoRenderer
+        ? QString()
+        : QStringLiteral("AirPlay Video Stream (ALT+ENTER for Fullscreen)");
+    if (!label.isEmpty()) {
+        newTitle = newTitle.isEmpty() ? label : label + " — " + newTitle;
     }
 
     // Rename the video window when it pops up.
     QTimer *monitorTimer = new QTimer(this);
-    connect(monitorTimer, &QTimer::timeout, this, [this, monitorTimer]() {
+    connect(monitorTimer, &QTimer::timeout, this, [this, monitorTimer, newTitle]() {
         if (!m_running) {
             monitorTimer->stop();
             monitorTimer->deleteLater();
@@ -473,7 +532,7 @@ void MainWindow::onAirplayStarted() {
 
         RenameData info;
         info.pid = GetCurrentProcessId();
-        info.newTitle = "AirPlay Video Stream (ALT+ENTER for Fullscreen)"; 
+        info.newTitle = newTitle;
 
         EnumWindows(EnumWindowsProcRename, reinterpret_cast<LPARAM>(&info));
     });

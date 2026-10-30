@@ -33,6 +33,7 @@ d3d12videosink
 jpegdec
 imagefreeze
 textoverlay
+videobox
 videoflip
 mp4mux
 aacparse

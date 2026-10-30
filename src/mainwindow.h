@@ -64,6 +64,7 @@ private:
     int instanceNumber() const;
     QString instanceSuffix() const;
     QStringList defaultArguments() const;
+    void applyLabelArgs(QStringList &args) const;
     QString autostartValueName() const;
     QString userArgumentsPath() const;
     QString machineArgumentsPath() const;
