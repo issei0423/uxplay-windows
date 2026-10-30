@@ -271,8 +271,9 @@ int main(int argc, char *argv[]) {
         ? QStringLiteral("uxplay-windows-%1").arg(instance)
         : QStringLiteral("uxplay-windows"));
     app.setProperty("instanceNumber", instance);
-    // --label, --frame and --icon decorate the video window (see MainWindow).
-    // Read them from QApplication so non-ASCII values survive on Windows.
+    // --label, --frame, --tab and --icon decorate the video window (see
+    // MainWindow). Read them from QApplication so non-ASCII values survive on
+    // Windows.
     const QList<QPair<QString, const char *>> decorations = {
         {"--label", "instanceLabel"},
         {"--frame", "instanceFrame"},
@@ -281,6 +282,10 @@ int main(int argc, char *argv[]) {
     const QStringList appArgs = app.arguments();
     for (int i = 1; i < appArgs.size(); ++i) {
         const QString &arg = appArgs.at(i);
+        if (arg == "--tab") {
+            app.setProperty("instanceTab", true);
+            continue;
+        }
         for (const auto &decoration : decorations) {
             if (arg == decoration.first && i + 1 < appArgs.size()) {
                 app.setProperty(decoration.second, appArgs.at(++i));

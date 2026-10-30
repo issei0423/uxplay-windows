@@ -393,15 +393,17 @@ void MainWindow::applyRendererAndFullscreenArgs(QStringList &args) {
     }
 }
 
-// --label, --frame and --icon come from the command line. The label becomes
-// the AirPlay name and is drawn on the video; the frame adds a coloured border
-// whose thick top edge holds the icon and the label like a tab. An explicit
-// -vc in the arguments file is left unchanged.
+// --label, --frame, --tab and --icon come from the command line. The label
+// becomes the AirPlay name and the video window title; the frame adds an even
+// coloured border. With --tab the top edge grows into a tab that shows the
+// icon and the label on the video. An explicit -vc in the arguments file is
+// left unchanged.
 void MainWindow::applyLabelArgs(QStringList &args) const {
     const QString label = qApp->property("instanceLabel").toString().trimmed();
     const QString frame = qApp->property("instanceFrame").toString().trimmed().toLower();
     const QString icon = qApp->property("instanceIcon").toString().trimmed();
-    if (label.isEmpty() && frame.isEmpty() && icon.isEmpty()) return;
+    const bool tab = qApp->property("instanceTab").toBool();
+    if (label.isEmpty() && frame.isEmpty() && !tab) return;
 
     if (!label.isEmpty()) {
         const int nameIdx = args.indexOf("-n");
@@ -421,10 +423,12 @@ void MainWindow::applyLabelArgs(QStringList &args) const {
         qWarning().noquote() << "[label] Unknown --frame colour, drawing no frame:" << frame;
     }
 
+    if (!framed && !tab) return;
+
     // Without the bundled PNG loader gdkpixbufoverlay would fail the whole
     // video pipeline, so leave the icon out instead.
     QSize iconSize;
-    if (!icon.isEmpty()) {
+    if (tab && !icon.isEmpty()) {
         if (!qApp->property("pixbufReady").toBool()) {
             qWarning().noquote() << "[label] PNG loader not available, drawing no icon";
         } else {
@@ -435,17 +439,18 @@ void MainWindow::applyLabelArgs(QStringList &args) const {
         }
     }
     const bool hasIcon = iconSize.isValid() && iconSize.height() > 0;
-    const int tabHeight = hasIcon ? 160 : 96;
+    const int border = 24;
+    const int top = !tab ? border : (hasIcon ? 160 : 96);
 
     QString converter = "videoconvert";
     if (framed) {
         converter += QStringLiteral(
-            " ! videobox fill=%1 top=-%2 bottom=-16 left=-16 right=-16 ! videoconvert")
-            .arg(frame).arg(tabHeight);
+            " ! videobox fill=%1 top=-%2 bottom=-%3 left=-%3 right=-%3 ! videoconvert")
+            .arg(frame, QString::number(top), QString::number(border));
     }
     int textX = 24;
     if (hasIcon) {
-        const int iconHeight = tabHeight - 16;
+        const int iconHeight = top - 16;
         const int iconWidth = qMax(1, iconSize.width() * iconHeight / iconSize.height());
         QString location = QDir::fromNativeSeparators(QFileInfo(icon).absoluteFilePath());
         location.replace("\"", "\\\"");
@@ -455,7 +460,7 @@ void MainWindow::applyLabelArgs(QStringList &args) const {
             .arg(location, QString::number(iconWidth), QString::number(iconHeight));
         textX = 16 + iconWidth + 16;
     }
-    if (!label.isEmpty()) {
+    if (tab && !label.isEmpty()) {
         QString text = label;
         text.replace("\\", "\\\\").replace("\"", "\\\"");
         QString style;
