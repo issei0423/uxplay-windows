@@ -74,6 +74,17 @@ Without the option (or with `--instance 1`) nothing changes. For N >= 2 everythi
 - logs in `%LOCALAPPDATA%\uxplay-windows-N\logs`
 - Bluetooth discovery is off by default, because two beacons on one machine can conflict
 
+To tell the copies apart, add `--label TEXT` and `--frame COLOUR`:
+
+```text
+uxplay-windows.exe --label "Teacher" --frame green
+uxplay-windows.exe --instance 2 --label "Parent" --frame blue
+```
+
+- `--label` sets the AirPlay name (replacing `-n`), the video window title and the text drawn in the top-left corner of the video
+- `--frame` draws a border around the video (`black`, `green`, `blue`, `red`, `yellow` or `white`); its thicker top edge holds the label like a tab
+- both are applied through `-vc`, so an explicit `-vc` in `arguments.txt` turns the drawing off
+
 </details>
 
 <details>
