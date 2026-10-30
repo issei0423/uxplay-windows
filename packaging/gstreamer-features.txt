@@ -34,6 +34,7 @@ jpegdec
 imagefreeze
 textoverlay
 videobox
+gdkpixbufoverlay
 videoflip
 mp4mux
 aacparse

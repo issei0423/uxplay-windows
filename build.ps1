@@ -464,6 +464,25 @@ function Stage-Runtime {
             Copy-Item -LiteralPath $_.FullName -Destination $gioDestination -Force
         }
 
+    # gdkpixbufoverlay (--icon) loads PNG files through this loader. The cache
+    # holds a build-time path; main.cpp rewrites it for the install location.
+    $pixbufDestination = Join-Path $stageDir "lib\gdk-pixbuf-2.0\2.10.0"
+    $pixbufLoaderDestination = Join-Path $pixbufDestination "loaders"
+    New-Item -ItemType Directory -Force -Path $pixbufLoaderDestination | Out-Null
+    Copy-Item `
+        -LiteralPath (Join-Path $prefix "lib\gdk-pixbuf-2.0\2.10.0\loaders\libpixbufloader-png.dll") `
+        -Destination $pixbufLoaderDestination `
+        -Force
+    $pixbufCache = & (Join-Path $prefix "bin\gdk-pixbuf-query-loaders.exe") `
+        (Join-Path $pixbufLoaderDestination "libpixbufloader-png.dll")
+    if ($LASTEXITCODE -ne 0) {
+        throw "gdk-pixbuf-query-loaders failed with exit code $LASTEXITCODE"
+    }
+    Set-Content `
+        -LiteralPath (Join-Path $pixbufDestination "loaders.cache") `
+        -Value $pixbufCache `
+        -Encoding ascii
+
     Copy-DirectoryContents `
         -Source (Join-Path $prefix "etc\fonts") `
         -Destination (Join-Path $stageDir "etc\fonts")

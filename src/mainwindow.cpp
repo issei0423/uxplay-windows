@@ -15,6 +15,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QImageReader>
 #include <QLabel>
 #include <QMenu>
 #include <QMessageBox>
@@ -392,14 +393,15 @@ void MainWindow::applyRendererAndFullscreenArgs(QStringList &args) {
     }
 }
 
-// --label and --frame come from the command line. The label becomes the
-// AirPlay name and is drawn on the video; the frame adds a coloured border
-// whose thick top edge holds the label like a tab. An explicit -vc in the
-// arguments file is left unchanged.
+// --label, --frame and --icon come from the command line. The label becomes
+// the AirPlay name and is drawn on the video; the frame adds a coloured border
+// whose thick top edge holds the icon and the label like a tab. An explicit
+// -vc in the arguments file is left unchanged.
 void MainWindow::applyLabelArgs(QStringList &args) const {
     const QString label = qApp->property("instanceLabel").toString().trimmed();
     const QString frame = qApp->property("instanceFrame").toString().trimmed().toLower();
-    if (label.isEmpty() && frame.isEmpty()) return;
+    const QString icon = qApp->property("instanceIcon").toString().trimmed();
+    if (label.isEmpty() && frame.isEmpty() && icon.isEmpty()) return;
 
     if (!label.isEmpty()) {
         const int nameIdx = args.indexOf("-n");
@@ -419,10 +421,39 @@ void MainWindow::applyLabelArgs(QStringList &args) const {
         qWarning().noquote() << "[label] Unknown --frame colour, drawing no frame:" << frame;
     }
 
+    // Without the bundled PNG loader gdkpixbufoverlay would fail the whole
+    // video pipeline, so leave the icon out instead.
+    QSize iconSize;
+    if (!icon.isEmpty()) {
+        if (!qApp->property("pixbufReady").toBool()) {
+            qWarning().noquote() << "[label] PNG loader not available, drawing no icon";
+        } else {
+            iconSize = QImageReader(icon).size();
+            if (!iconSize.isValid()) {
+                qWarning().noquote() << "[label] Cannot read --icon, drawing no icon:" << icon;
+            }
+        }
+    }
+    const bool hasIcon = iconSize.isValid() && iconSize.height() > 0;
+    const int tabHeight = hasIcon ? 160 : 96;
+
     QString converter = "videoconvert";
     if (framed) {
         converter += QStringLiteral(
-            " ! videobox fill=%1 top=-96 bottom=-16 left=-16 right=-16 ! videoconvert").arg(frame);
+            " ! videobox fill=%1 top=-%2 bottom=-16 left=-16 right=-16 ! videoconvert")
+            .arg(frame).arg(tabHeight);
+    }
+    int textX = 24;
+    if (hasIcon) {
+        const int iconHeight = tabHeight - 16;
+        const int iconWidth = qMax(1, iconSize.width() * iconHeight / iconSize.height());
+        QString location = QDir::fromNativeSeparators(QFileInfo(icon).absoluteFilePath());
+        location.replace("\"", "\\\"");
+        converter += QStringLiteral(
+            " ! gdkpixbufoverlay location=\"%1\" offset-x=16 offset-y=8"
+            " overlay-width=%2 overlay-height=%3 ! videoconvert")
+            .arg(location, QString::number(iconWidth), QString::number(iconHeight));
+        textX = 16 + iconWidth + 16;
     }
     if (!label.isEmpty()) {
         QString text = label;
@@ -435,7 +466,8 @@ void MainWindow::applyLabelArgs(QStringList &args) const {
         }
         converter += QStringLiteral(
             " ! textoverlay text=\"%1\" valignment=top halignment=left"
-            " xpad=24 ypad=12 font-desc=\"Sans Bold 18\"%2 ! videoconvert").arg(text, style);
+            " xpad=%2 ypad=%3 font-desc=\"Sans Bold 18\"%4 ! videoconvert")
+            .arg(text, QString::number(textX), QString::number(hasIcon ? 56 : 12), style);
     }
     args << "-vc" << converter;
 }

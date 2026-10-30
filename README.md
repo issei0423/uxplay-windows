@@ -83,7 +83,8 @@ uxplay-windows.exe --instance 2 --label "Parent" --frame blue
 
 - `--label` sets the AirPlay name (replacing `-n`), the video window title and the text drawn in the top-left corner of the video
 - `--frame` draws a border around the video (`black`, `green`, `blue`, `red`, `yellow` or `white`); its thicker top edge holds the label like a tab
-- both are applied through `-vc`, so an explicit `-vc` in `arguments.txt` turns the drawing off
+- `--icon PATH` puts a PNG (transparency is kept) at the left of the tab, before the label
+- all three are applied through `-vc`, so an explicit `-vc` in `arguments.txt` turns the drawing off
 
 </details>
 

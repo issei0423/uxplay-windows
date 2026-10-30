@@ -9,6 +9,7 @@
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QMessageBox>
+#include <QPair>
 #include <QPointer>
 #include <QProcess>
 #include <QProcessEnvironment>
@@ -119,6 +120,48 @@ static void activateWindow(MainWindow *window) {
 }
 #endif
 
+// gdkpixbufoverlay (--icon) loads PNG files through gdk-pixbuf, which finds
+// its loader through a cache of absolute paths. Rewrite the bundled cache for
+// this install location and point gdk-pixbuf at the copy.
+static bool preparePixbufLoaders(const QString &appPath) {
+    const QDir pixbufDir(QDir(appPath).filePath("lib/gdk-pixbuf-2.0/2.10.0"));
+    const QString loader = pixbufDir.filePath("loaders/libpixbufloader-png.dll");
+    QFile bundled(pixbufDir.filePath("loaders.cache"));
+    if (!QFileInfo::exists(loader) ||
+        !bundled.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        return false;
+    }
+
+    QStringList lines = QString::fromUtf8(bundled.readAll()).split('\n');
+    bundled.close();
+    bool replaced = false;
+    for (QString &line : lines) {
+        const QString trimmed = line.trimmed();
+        if (trimmed.startsWith('"') && trimmed.endsWith(".dll\"")) {
+            line = "\"" + QDir::fromNativeSeparators(loader) + "\"";
+            replaced = true;
+        }
+    }
+    if (!replaced) {
+        return false;
+    }
+
+    const QString cacheDir =
+        QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QDir().mkpath(cacheDir);
+    const QString cachePath = QDir(cacheDir).filePath("pixbuf-loaders.cache");
+    // Write without text mode: gdk-pixbuf expects plain "\n" line endings.
+    QFile cache(cachePath);
+    if (!cache.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        return false;
+    }
+    cache.write(lines.join('\n').toUtf8());
+    cache.close();
+
+    qputenv("GDK_PIXBUF_MODULE_FILE", QDir::toNativeSeparators(cachePath).toUtf8());
+    return true;
+}
+
 static int runRuntimeSelfTest(const QString &appPath) {
     QStringList requiredFiles = {
         "uxplay-bluetooth-beacon.exe",
@@ -228,19 +271,31 @@ int main(int argc, char *argv[]) {
         ? QStringLiteral("uxplay-windows-%1").arg(instance)
         : QStringLiteral("uxplay-windows"));
     app.setProperty("instanceNumber", instance);
-    // --label and --frame decorate the video window (see MainWindow). Read
-    // them from QApplication so non-ASCII labels survive on Windows.
+    // --label, --frame and --icon decorate the video window (see MainWindow).
+    // Read them from QApplication so non-ASCII values survive on Windows.
+    const QList<QPair<QString, const char *>> decorations = {
+        {"--label", "instanceLabel"},
+        {"--frame", "instanceFrame"},
+        {"--icon", "instanceIcon"}
+    };
     const QStringList appArgs = app.arguments();
     for (int i = 1; i < appArgs.size(); ++i) {
         const QString &arg = appArgs.at(i);
-        if ((arg == "--label" || arg == "--frame") && i + 1 < appArgs.size()) {
-            app.setProperty(arg == "--label" ? "instanceLabel" : "instanceFrame",
-                            appArgs.at(++i));
-        } else if (arg.startsWith("--label=")) {
-            app.setProperty("instanceLabel", arg.mid(QString("--label=").size()));
-        } else if (arg.startsWith("--frame=")) {
-            app.setProperty("instanceFrame", arg.mid(QString("--frame=").size()));
+        for (const auto &decoration : decorations) {
+            if (arg == decoration.first && i + 1 < appArgs.size()) {
+                app.setProperty(decoration.second, appArgs.at(++i));
+                break;
+            }
+            if (arg.startsWith(decoration.first + "=")) {
+                app.setProperty(decoration.second,
+                                arg.mid(decoration.first.size() + 1));
+                break;
+            }
         }
+    }
+    if (!app.property("instanceIcon").toString().isEmpty()) {
+        app.setProperty("pixbufReady",
+                        preparePixbufLoaders(QApplication::applicationDirPath()));
     }
     if (!instanceValid) {
         QMessageBox::critical(
