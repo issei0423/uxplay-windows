@@ -58,6 +58,22 @@ Environment variables are expanded when the app starts. For example:
 -n %COMPUTERNAME% -nh
 ```
 
+#### Running a second instance
+
+To mirror two devices at once, start a second copy with `--instance N` (N = 1-9):
+
+```text
+uxplay-windows.exe --instance 2
+```
+
+Without the option (or with `--instance 1`) nothing changes. For N >= 2 everything is kept separate per number:
+
+- `%ProgramData%\uxplay-windows-N\arguments.txt`, then `%APPDATA%\leapbtw\uxplay-windows-N\arguments.txt`
+- default arguments: `-n uxplay-windows-N -nh -m 02:55:58:50:4C:0N` (own name and device ID)
+- settings (registry), the Bluetooth status file and the autostart entry (`uxplay-windows-N`, registered with `--instance N`)
+- logs in `%LOCALAPPDATA%\uxplay-windows-N\logs`
+- Bluetooth discovery is off by default, because two beacons on one machine can conflict
+
 </details>
 
 <details>

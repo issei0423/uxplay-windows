@@ -61,6 +61,10 @@ private:
 
     QStringList getArgumentsFromFile();
     void ensureSettingsFileExists();
+    int instanceNumber() const;
+    QString instanceSuffix() const;
+    QStringList defaultArguments() const;
+    QString autostartValueName() const;
     QString userArgumentsPath() const;
     QString machineArgumentsPath() const;
     QString activeArgumentsPath() const;

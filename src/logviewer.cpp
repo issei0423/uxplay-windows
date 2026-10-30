@@ -15,7 +15,10 @@
 
 LogViewer::LogViewer(const QString &path, QWidget *parent)
     : QDialog(parent), m_file(path) {
-    setWindowTitle("Current log — uxplay-windows");
+    const int instance = qApp->property("instanceNumber").toInt();
+    setWindowTitle(instance > 1
+        ? QStringLiteral("Current log — uxplay-windows (%1)").arg(instance)
+        : QStringLiteral("Current log — uxplay-windows"));
     resize(900, 550);
     auto *layout = new QVBoxLayout(this);
     auto *location = new QLabel(QDir::toNativeSeparators(path), this);

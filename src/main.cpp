@@ -12,6 +12,7 @@
 #include <QPointer>
 #include <QProcess>
 #include <QProcessEnvironment>
+#include <QStandardPaths>
 #include <QSystemTrayIcon>
 #include <QTextStream>
 #include <QThread>
@@ -23,6 +24,37 @@
 #include <cstdio>
 #include <io.h>
 #endif
+
+// Parses "--instance N" / "--instance=N" (N = 1..9) from the raw arguments.
+// Returns 1 when the option is absent. Sets ok to false for a bad value.
+static int parseInstanceNumber(int argc, char *argv[], bool &ok) {
+    ok = true;
+    int instance = 1;
+    for (int i = 1; i < argc; ++i) {
+        const QString arg = QString::fromLocal8Bit(argv[i]);
+        QString value;
+        if (arg == "--instance") {
+            if (i + 1 >= argc) {
+                ok = false;
+                return 1;
+            }
+            value = QString::fromLocal8Bit(argv[++i]);
+        } else if (arg.startsWith("--instance=")) {
+            value = arg.mid(QString("--instance=").size());
+        } else {
+            continue;
+        }
+
+        bool converted = false;
+        const int number = value.toInt(&converted);
+        if (!converted || number < 1 || number > 9) {
+            ok = false;
+            return 1;
+        }
+        instance = number;
+    }
+    return instance;
+}
 
 #ifdef _WIN32
 static DWORD currentSessionId() {
@@ -172,11 +204,33 @@ int main(int argc, char *argv[]) {
 #endif
 
     // Keep logging alive through QApplication destruction as well.
+    // Qt may strip arguments it recognises, so read --instance first. The
+    // session log starts before QApplication, so it needs the number too.
+    bool instanceValid = true;
+    const int instance = parseInstanceNumber(argc, argv, instanceValid);
+    QString logDirectory;
+    if (instance > 1) {
+        logDirectory = QDir(QStandardPaths::writableLocation(
+                                QStandardPaths::GenericDataLocation))
+            .filePath(QStringLiteral("uxplay-windows-%1/logs").arg(instance));
+    }
+
     SessionLog sessionLog;
-    const bool loggingReady = sessionLog.start();
+    const bool loggingReady = sessionLog.start(logDirectory);
     QApplication app(argc, argv);
     app.setOrganizationName("leapbtw");
-    app.setApplicationName("uxplay-windows");
+    app.setApplicationName(instance > 1
+        ? QStringLiteral("uxplay-windows-%1").arg(instance)
+        : QStringLiteral("uxplay-windows"));
+    app.setProperty("instanceNumber", instance);
+    if (!instanceValid) {
+        QMessageBox::critical(
+            nullptr,
+            "uxplay-windows",
+            "Invalid --instance value. Use a number from 1 to 9."
+        );
+        return 1;
+    }
     app.setProperty("sessionLogPath", loggingReady ? sessionLog.path() : QString());
     if (!loggingReady) {
         QMessageBox::warning(nullptr, "Logging unavailable", sessionLog.errorString());
@@ -215,7 +269,7 @@ int main(int argc, char *argv[]) {
     }
 
 #ifdef _WIN32
-    const QString mutexName = singleInstanceMutexName();
+    const QString mutexName = singleInstanceMutexName(instance);
     SetLastError(ERROR_SUCCESS);
     HANDLE singleInstanceMutex = CreateMutexW(
         nullptr,
@@ -252,7 +306,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    const QString serverName = singleInstanceServerName();
+    const QString serverName = singleInstanceServerName(instance);
     if (alreadyRunning) {
         const bool notified = notifyRunningInstance(serverName);
         CloseHandle(singleInstanceMutex);

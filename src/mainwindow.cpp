@@ -83,11 +83,38 @@ QString MainWindow::userArgumentsPath() const {
     return appDataPath + "/arguments.txt";
 }
 
+int MainWindow::instanceNumber() const {
+    const int instance = qApp->property("instanceNumber").toInt();
+    return (instance >= 1 && instance <= 9) ? instance : 1;
+}
+
+QString MainWindow::instanceSuffix() const {
+    return instanceNumber() > 1 ? QStringLiteral(" (%1)").arg(instanceNumber())
+                                : QString();
+}
+
+QStringList MainWindow::defaultArguments() const {
+    const int instance = instanceNumber();
+    if (instance <= 1) {
+        return defaultArguments();
+    }
+
+    // Two UxPlay servers on one PC need distinct names and device IDs (MAC).
+    return QStringList()
+        << "-n" << QStringLiteral("uxplay-windows-%1").arg(instance)
+        << "-nh"
+        << "-m" << QStringLiteral("02:55:58:50:4C:0%1").arg(instance);
+}
+
 QString MainWindow::machineArgumentsPath() const {
     QString programDataPath =
         QProcessEnvironment::systemEnvironment().value("ProgramData");
     if (programDataPath.isEmpty()) {
         programDataPath = "C:/ProgramData";
+    }
+    if (instanceNumber() > 1) {
+        return programDataPath +
+               QStringLiteral("/uxplay-windows-%1/arguments.txt").arg(instanceNumber());
     }
     return programDataPath + "/uxplay-windows/arguments.txt";
 }
@@ -123,7 +150,7 @@ void MainWindow::ensureSettingsFileExists() {
     QFile file(userArgumentsPath());
     if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
         QTextStream out(&file);
-        out << "-n uxplay-windows -nh";
+        out << defaultArguments().join(' ');
         file.close();
     }
 }
@@ -155,7 +182,7 @@ QStringList MainWindow::getArgumentsFromFile() {
 }
 
 void MainWindow::setupUI() {
-    setWindowTitle("uxplay-windows");
+    setWindowTitle("uxplay-windows" + instanceSuffix());
     setWindowIcon(QApplication::windowIcon());
     setFixedSize(320, 310);
 
@@ -170,7 +197,7 @@ void MainWindow::setupUI() {
     // Bluetooth Discovery Checkbox
     m_bleCheckbox = new QCheckBox("Enable Bluetooth Discovery", this);
     QSettings settings;
-    m_bleCheckbox->setChecked(settings.value("ble_enabled", true).toBool());
+    m_bleCheckbox->setChecked(settings.value("ble_enabled", instanceNumber() <= 1).toBool());
     connect(m_bleCheckbox, &QCheckBox::toggled, this, &MainWindow::toggleBle);
     layout->addWidget(m_bleCheckbox);
 
@@ -267,7 +294,7 @@ void MainWindow::setupTray() {
         trayIcon = QApplication::style()->standardIcon(QStyle::SP_MediaPlay);
     }
     m_tray->setIcon(trayIcon);
-    m_tray->setToolTip("uxplay-windows");
+    m_tray->setToolTip("uxplay-windows" + instanceSuffix());
 
     m_trayMenu = new QMenu(this);
     m_trayMenu->addAction("Open current log", this, &MainWindow::openCurrentLog);
@@ -474,18 +501,28 @@ void MainWindow::toggleAutostart(bool checked) {
     updateStatus();
 }
 
+QString MainWindow::autostartValueName() const {
+    return instanceNumber() > 1
+        ? QStringLiteral("uxplay-windows-%1").arg(instanceNumber())
+        : QStringLiteral("uxplay-windows");
+}
+
 bool MainWindow::isAutostartEnabled() const {
     QSettings reg("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", QSettings::NativeFormat);
-    return reg.contains("uxplay-windows");
+    return reg.contains(autostartValueName());
 }
 
 void MainWindow::setAutostart(bool enabled) {
     QSettings reg("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", QSettings::NativeFormat);
     if (enabled) {
         QString path = QDir::toNativeSeparators(QApplication::applicationFilePath());
-        reg.setValue("uxplay-windows", "\"" + path + "\"");
+        QString command = "\"" + path + "\"";
+        if (instanceNumber() > 1) {
+            command += QStringLiteral(" --instance %1").arg(instanceNumber());
+        }
+        reg.setValue(autostartValueName(), command);
     } else {
-        reg.remove("uxplay-windows");
+        reg.remove(autostartValueName());
     }
 }
 
