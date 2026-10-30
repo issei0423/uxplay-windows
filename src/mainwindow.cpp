@@ -96,7 +96,7 @@ QString MainWindow::instanceSuffix() const {
 QStringList MainWindow::defaultArguments() const {
     const int instance = instanceNumber();
     if (instance <= 1) {
-        return defaultArguments();
+        return QStringList() << "-n" << "uxplay-windows" << "-nh";
     }
 
     // Two UxPlay servers on one PC need distinct names and device IDs (MAC).
@@ -178,7 +178,7 @@ QStringList MainWindow::getArgumentsFromFile() {
 
     qWarning().noquote()
         << "[arguments] Unable to read the selected file; using built-in defaults.";
-    return QStringList() << "-n" << "uxplay-windows" << "-nh";
+    return defaultArguments();
 }
 
 void MainWindow::setupUI() {
