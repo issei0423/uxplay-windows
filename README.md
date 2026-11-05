@@ -87,6 +87,15 @@ uxplay-windows.exe --instance 2 --label "Parent" --frame blue
 - `--label-size N` sets the label height in video pixels (default 80); the tab grows with it
 - the drawing is applied through `-vc`, so an explicit `-vc` in `arguments.txt` turns it off
 
+When several devices mirror to one PC:
+
+- do not add `-nohold`. When a device opens its Screen Mirroring list, iOS sends a request to every receiver it sees, and with `-nohold` that request alone takes over the running session, so the device mirroring there is cut off
+- give instance 1 its own device ID too, e.g. `-m 02:55:58:50:4C:01`. Without `-m` UxPlay uses the MAC of the first network adapter; on a PC with WSL or Hyper-V that adapter is virtual and gets a new MAC at every restart, so the devices see a new receiver each time
+
+#### Sleep while mirroring
+
+While a device is connected, uxplay-windows keeps the PC and the display awake, so a laptop on battery does not sleep (and drop Wi-Fi) in the middle of a session. It lets go once the device disconnects. Closing the lid still puts the PC to sleep.
+
 </details>
 
 <details>
