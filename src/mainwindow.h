@@ -43,6 +43,7 @@ private slots:
     void toggleBle(bool checked); // bluetooth
     void toggleForceFullscreen(bool checked);
     void onRendererChanged(int index);
+    void updateKeepAwake();
 
 
 private:
@@ -95,4 +96,5 @@ private:
 
     bool m_running = false;
     bool m_quitting = false;
+    bool m_keepAwake = false;
 };

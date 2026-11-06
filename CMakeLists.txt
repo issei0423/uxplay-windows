@@ -18,6 +18,7 @@ add_executable(uxplay-windows WIN32
     src/sessionlog.cpp
     src/logviewer.cpp
     src/mdns_responder.cpp
+    src/keepawake.cpp
     src/resources.rc
 )
 
@@ -26,6 +27,8 @@ target_link_libraries(uxplay-windows PRIVATE
     Qt6::Network
     Qt6::Widgets
     uxplay
+    iphlpapi
+    ws2_32
 )
 
 target_include_directories(uxplay-windows PRIVATE

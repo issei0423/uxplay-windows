@@ -2,6 +2,7 @@
 #include "airplayworker.h"
 #include "logviewer.h"
 #include "mdns_responder.hpp"
+#include "keepawake.h"
 #include <windows.h>
 #include <winsvc.h>
 #include <io.h>
@@ -65,6 +66,11 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     // Bonjour improves device discovery, but the server can also run without it.
     if (ensureBonjourServiceInstalled()) {
         startServer();
+
+        // Keep the PC and the display awake while a client is connected.
+        QTimer *keepAwakeTimer = new QTimer(this);
+        connect(keepAwakeTimer, &QTimer::timeout, this, &MainWindow::updateKeepAwake);
+        keepAwakeTimer->start(5000);
     } else {
         if (!m_quitting) {
             m_quitting = true;
@@ -548,7 +554,21 @@ void MainWindow::stopServer() {
         m_worker = nullptr;
     }
     m_running = false;
+    updateKeepAwake();
     updateStatus();
+}
+
+// Windows does not see the GStreamer window as playing media, so on battery it
+// may sleep in the middle of a session and drop the client. Hold the system and
+// the display awake while a client is connected, and let go once it leaves.
+void MainWindow::updateKeepAwake() {
+    const bool wanted = m_running && keepawake::hasClientConnection();
+    if (wanted == m_keepAwake) return;
+
+    m_keepAwake = wanted;
+    keepawake::set(wanted);
+    qInfo("%s", wanted ? "Client connected; keeping the PC and the display awake."
+                       : "No client connected; the PC may sleep again.");
 }
 
 
@@ -596,6 +616,7 @@ void MainWindow::onAirplayStarted() {
 
 void MainWindow::onAirplayStopped() {
     m_running = false;
+    updateKeepAwake();
     updateStatus();
     
     if (!m_quitting) {
