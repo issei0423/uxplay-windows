@@ -616,6 +616,7 @@ void MainWindow::onAirplayStarted() {
 
 void MainWindow::onAirplayStopped() {
     m_running = false;
+    updateKeepAwake();
     updateStatus();
     
     if (!m_quitting) {
